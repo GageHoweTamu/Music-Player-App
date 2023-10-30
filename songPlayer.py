@@ -1,6 +1,3 @@
-# ensure Python is installed
-# run "pip install pygame" or "pip3 install pygame"
-
 import os
 import pygame
 import signal
@@ -10,10 +7,6 @@ import random
 import tkinter as tk
 from tkinter import filedialog
 import time
-
-os.environ['OBJC_DISABLE_INITIALIZE_FORK_SAFETY'] = 'YES'
-
-volume = 1
 
 def find_music_files(folder_path=None, query=None):
     print("\n\n\n\n\n\n\n\n\n\n\n\n")
@@ -31,96 +24,99 @@ def find_music_files(folder_path=None, query=None):
                     music_files.append(os.path.join(root, file))
     return music_files
 
-def play_songs(songs, folder_path, shuffle):
-    random.seed(time.time())
+def set_volume(vol):
+    global volume
+    volume = float(vol)
+    pygame.mixer.music.set_volume(volume)
+
+
+def shuffle_playlist():
+    global shuffle
+    shuffle = not shuffle
     if shuffle:
         random.shuffle(songs)
-    pygame.mixer.init()
-    pygame.mixer.music.set_volume(volume)  # Adjust the volume
-    paused = False
-    current_song_index = 0
+    print(f"Shuffle {'on' if shuffle else 'off'}")
 
-    while True:
-        if paused:
-            while True:
-                command = input("Type 'r' to resume: ").lower()
-                if command == "r":
-                    pygame.mixer.music.unpause()
-                    paused = False
-                    break
-
-        if not pygame.mixer.music.get_busy():
-            current_song_index += 1
-            if current_song_index >= len(songs):
-                current_song_index = 0
-                if shuffle:
-                    random.shuffle(songs)
-            pygame.mixer.music.load(songs[current_song_index])
-            pygame.mixer.music.play()
-            print(f"\nNow playing: {os.path.basename(songs[current_song_index])}\n")
-
-        if not paused:
-            while pygame.mixer.music.get_busy():
-                command = input("Type 'search' to search for a song, \n'p' to pause, \n'r' to resume, \n's' to skip, \n'q' to quit, \n'v' to adjust volume, or \n'sh' to toggle shuffle: ").lower()
-                if command == "search":
-                    query = input("Enter a search query: ")
-                    matching_songs = [file for file in music_files if query.lower() in os.path.basename(file).lower()]
-                    if len(matching_songs) == 0:
-                        print("No matching songs found.")
-                    else:
-                        songs = matching_songs
-                        current_song_index = 0
-                        if shuffle:
-                            random.shuffle(songs)
-
-                        pygame.mixer.music.load(songs[current_song_index])
-                        pygame.mixer.music.play()
-                        print(f"\nNow playing: {os.path.basename(songs[current_song_index])}\n")
-                        break
-                elif command == "p":
-                    pygame.mixer.music.pause()
-                    paused = True
-                    break
-                elif command == "r":
-                    pygame.mixer.music.unpause()
-                    paused = False
-                    break
-                elif command == "s":
-                    pygame.mixer.music.stop()
-                    current_song_index += 1
-                    if current_song_index >= len(songs):
-                        current_song_index = 0
-                        if shuffle:
-                            random.shuffle(songs)
-                    pygame.mixer.music.load(songs[current_song_index])
-                    pygame.mixer.music.play()
-                    print(f"\nNow playing: {os.path.basename(songs[current_song_index])}\n")
-                    break
-                elif command == "q":
-                    pygame.mixer.music.stop()
-                    pygame.mixer.quit()
-                    sys.exit(0)
-                elif command == "sh":
-                    shuffle = not shuffle
-                    if shuffle:
-                        random.shuffle(songs)
-                    print(f"Shuffle {'on' if shuffle else 'off'}")
-                elif command == "v":
-                    pygame.mixer.music.set_volume(float(input("Enter a volume between 0 and 1: ")))
-                    break
-
-        if current_song_index == len(songs) - 1 and not pygame.mixer.music.get_busy():
-            pygame.mixer.music.stop()
-            break
-
-if __name__ == "__main__":
-    folder_path = ""
-    music_files = find_music_files(folder_path)
-
-    if len(music_files) == 0:
-        print("No music files were found in the specified folder.")
+def pause_play():
+    global paused
+    if not paused:
+        pygame.mixer.music.pause()
+        paused = True
+        print("Paused")
     else:
-        print(f"Found {len(music_files)} music files in the folder and its subfolders.")
-        play_songs(music_files, folder_path, shuffle=True)
+        pygame.mixer.music.unpause()
+        paused = False
+        print("Unpaused")
 
-    atexit.register(pygame.mixer.quit)
+def play_next_song():
+    global current_song_index
+    if current_song_index < len(songs) - 1:
+        current_song_index += 1
+        play_song()
+
+def play_prev_song():
+    global current_song_index
+    if current_song_index > 0:
+        current_song_index -= 1
+        play_song()
+
+def play_song():
+    global paused
+    if not paused:
+        pygame.mixer.music.load(songs[current_song_index])
+    if paused:
+        pygame.mixer.music.unpause()
+        paused = False
+    pygame.mixer.music.play()
+    print(f"\nNow playing: {os.path.basename(songs[current_song_index])}\n")
+
+def stop_music(): 
+    pygame.mixer.music.stop()
+    print("Stopped")
+    exit_app()
+
+def exit_app():
+    pygame.mixer.quit()
+    root.destroy()
+    sys.exit()
+
+pygame.mixer.init()
+os.environ['OBJC_DISABLE_INITIALIZE_FORK_SAFETY'] = 'YES'
+set_volume(0)
+paused = False
+shuffle = False
+current_song_index = 0
+
+songs = find_music_files()
+
+if not songs:
+    print("No music files found in the selected folder.")
+    sys.exit()
+
+root = tk.Tk()
+root.title("Music Player")
+
+# Create and configure the GUI elements
+frame = tk.Frame(root)
+frame.pack(padx=20, pady=20)
+
+play_button = tk.Button(frame, text="Play", command=play_song)
+pause_play_button = tk.Button(frame, text="Pause/Unpause", command=pause_play)
+next_button = tk.Button(frame, text="Next", command=play_next_song)
+prev_button = tk.Button(frame, text="Previous", command=play_prev_song)
+shuffle_button = tk.Button(frame, text="Shuffle", command=shuffle_playlist)
+volume_scale = tk.Scale(frame, from_=0, to=1, resolution=0.01, orient="horizontal", label="Volume", command=set_volume)
+
+stop_button = tk.Button(frame, text="Stop", command=quit)
+
+play_button.pack(side="left", fill="both", expand=True, padx=5, pady=5, ipadx=10, ipady=10)
+pause_play_button.pack(side="left", fill="both", expand=True, padx=5, pady=5, ipadx=10, ipady=10)
+prev_button.pack(side="left", fill="both", expand=True, padx=5, pady=5, ipadx=10, ipady=10)
+next_button.pack(side="left", fill="both", expand=True, padx=5, pady=5, ipadx=10, ipady=10)
+shuffle_button.pack(side="left", fill="both", expand=True, padx=5, pady=5, ipadx=10, ipady=10)
+volume_scale.pack(side="right", fill="both", expand=True, padx=5, pady=5, ipadx=10, ipady=10)
+stop_button.pack(side="right", fill="both", expand=True, padx=5, pady=5, ipadx=10, ipady=10)
+
+atexit.register(exit_app)
+root.protocol("WM_DELETE_WINDOW", exit_app)
+root.mainloop()
